@@ -1,0 +1,54 @@
+name: Databricks CI/CD
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run unit tests
+        run: |
+          pytest -q
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: ubuntu-latest
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DATABRICKS_JOB_NAME: ${{ secrets.DATABRICKS_JOB_NAME }}
+      DATABRICKS_JOB_SPARK_VERSION: ${{ secrets.DATABRICKS_JOB_SPARK_VERSION }}
+      DATABRICKS_JOB_NODE_TYPE_ID: ${{ secrets.DATABRICKS_JOB_NODE_TYPE_ID }}
+      DATABRICKS_JOB_NUM_WORKERS: ${{ secrets.DATABRICKS_JOB_NUM_WORKERS }}
+      PIPELINE_BRONZE_TABLE: ${{ secrets.PIPELINE_BRONZE_TABLE }}
+      PIPELINE_SILVER_TABLE: ${{ secrets.PIPELINE_SILVER_TABLE }}
+      PIPELINE_GOLD_TABLE: ${{ secrets.PIPELINE_GOLD_TABLE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Create or update Databricks job
+        run: |
+          python deploy/create_job.py
+      - name: Schedule Databricks job and trigger run
+        run: |
+          python deploy/schedule_job.py
+

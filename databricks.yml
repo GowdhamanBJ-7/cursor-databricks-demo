@@ -1,0 +1,54 @@
+# This is a Databricks asset bundle definition for cursor-databricks-demo.
+# The Databricks extension requires databricks.yml configuration file.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+
+bundle:
+  name: cursor-databricks-demo
+
+resources:
+  jobs:
+    nyc_taxi_medallion_etl:
+      name: nyc-taxi-medallion-etl
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "UTC"
+      job_clusters:
+        - job_cluster_key: job_cluster
+          new_cluster:
+            spark_version: "15.4.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+            data_security_mode: SINGLE_USER
+      tasks:
+        - task_key: bronze
+          job_cluster_key: job_cluster
+          spark_python_task:
+            python_file: "pipeline/etl_pipeline.py"
+            parameters: ["--stages", "bronze"]
+        - task_key: silver
+          depends_on:
+            - task_key: bronze
+          job_cluster_key: job_cluster
+          spark_python_task:
+            python_file: "pipeline/etl_pipeline.py"
+            parameters: ["--stages", "silver"]
+        - task_key: gold
+          depends_on:
+            - task_key: silver
+          job_cluster_key: job_cluster
+          spark_python_task:
+            python_file: "pipeline/etl_pipeline.py"
+            parameters: ["--stages", "gold"]
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-a8b5283c-41bc.cloud.databricks.com
+
+  prod:
+    mode: production
+    workspace:
+      host: ${env.DATABRICKS_HOST}

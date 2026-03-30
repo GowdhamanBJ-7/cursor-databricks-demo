@@ -1,0 +1,130 @@
+import logging
+from typing import Optional
+
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
+
+from config.databricks_config import PipelineConfig
+
+
+logger = logging.getLogger(__name__)
+
+
+def read_nyc_taxi_csv(
+    spark: SparkSession,
+    source_path: str = "/databricks-datasets/nyctaxi/",
+    csv_glob: str = "**/*.csv",
+) -> DataFrame:
+    """
+    Read the NYC Taxi CSV dataset from the Databricks datasets path.
+
+    Parameters
+    ----------
+    spark : SparkSession
+        Active Spark session.
+    source_path : str, optional
+        Base path of the NYC Taxi dataset, by default "/databricks-datasets/nyctaxi/".
+    csv_glob : str, optional
+        Glob pattern below the source path, by default "**/*.csv".
+
+    Returns
+    -------
+    DataFrame
+        Raw CSV dataset with headers.
+    """
+
+    path = f"{source_path.rstrip('/')}/{csv_glob}"
+    logger.info("Reading NYC Taxi CSV from: %s", path)
+    return (
+        spark.read.option("header", True)
+        .option("inferSchema", False)
+        .option("mode", "PERMISSIVE")
+        .csv(path)
+    )
+
+
+def add_bronze_audit_and_partitions(df: DataFrame) -> DataFrame:
+    """
+    Add Bronze audit columns and partition columns (year, month).
+
+    Audit columns:
+    - _ingested_at: current timestamp (string)
+    - _source_file: input_file_name()
+
+    Partition columns:
+    - pickup_year
+    - pickup_month
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw dataframe read from CSV.
+
+    Returns
+    -------
+    DataFrame
+        Dataframe with audit + partition columns.
+    """
+
+    pickup_ts = F.to_timestamp(F.col("tpep_pickup_datetime"))
+    with_partitions = (
+        df.withColumn("_ingested_at", F.current_timestamp().cast("string"))
+        .withColumn("_source_file", F.input_file_name())
+        .withColumn("pickup_year", F.year(pickup_ts))
+        .withColumn("pickup_month", F.month(pickup_ts))
+    )
+    return with_partitions
+
+
+def write_bronze_table(
+    df: DataFrame,
+    config: PipelineConfig,
+    mode: str = "append",
+    optimize_write: Optional[bool] = None,
+) -> None:
+    """
+    Write the Bronze Delta table partitioned by year and month.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Bronze dataframe.
+    config : PipelineConfig
+        Pipeline configuration containing the Bronze table name.
+    mode : str, optional
+        Write mode, by default "append".
+    optimize_write : Optional[bool], optional
+        Whether to enable optimized writes; if None, uses Spark defaults.
+    """
+
+    writer = df.write.format("delta").mode(mode).option("mergeSchema", "true")
+    if optimize_write is not None:
+        writer = writer.option("delta.autoOptimize.optimizeWrite", str(optimize_write).lower())
+
+    logger.info(
+        "Writing Bronze Delta table: %s (mode=%s, partitionBy=pickup_year,pickup_month)",
+        config.bronze_table,
+        mode,
+    )
+    (
+        writer.partitionBy("pickup_year", "pickup_month")
+        .saveAsTable(config.bronze_table)
+    )
+
+
+def ingest_to_bronze(spark: SparkSession, config: PipelineConfig) -> None:
+    """
+    End-to-end ingestion from Databricks datasets to Bronze Delta table.
+
+    Parameters
+    ----------
+    spark : SparkSession
+        Active Spark session.
+    config : PipelineConfig
+        Pipeline configuration containing the Bronze table name.
+    """
+
+    raw = read_nyc_taxi_csv(spark)
+    bronze = add_bronze_audit_and_partitions(raw)
+    write_bronze_table(bronze, config=config)
+
