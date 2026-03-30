@@ -68,10 +68,13 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
 
     # Serverless workflows use environments + environment_key on tasks.
     environment_key = "default"
+    # Some workspaces reject client channel "1" for REPL workloads.
+    # Use "2" by default and allow override through env.
+    serverless_client = os.environ.get("DATABRICKS_SERVERLESS_CLIENT", "2").strip() or "2"
     environments = [
         jobs.JobEnvironment(
             environment_key=environment_key,
-            spec=compute.Environment(client="1"),
+            spec=compute.Environment(client=serverless_client),
         )
     ]
 
