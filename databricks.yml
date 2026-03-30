@@ -10,33 +10,31 @@ resources:
     nyc_taxi_medallion_etl:
       name: nyc-taxi-medallion-etl
       max_concurrent_runs: 1
+      performance_target: PERFORMANCE_OPTIMIZED
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"
         timezone_id: "UTC"
-      job_clusters:
-        - job_cluster_key: job_cluster
-          new_cluster:
-            spark_version: "15.4.x-scala2.12"
-            node_type_id: "i3.xlarge"
-            num_workers: 2
-            data_security_mode: SINGLE_USER
+      environments:
+        - environment_key: default
+          spec:
+            client: "1"
       tasks:
         - task_key: bronze
-          job_cluster_key: job_cluster
+          environment_key: default
           spark_python_task:
             python_file: "pipeline/etl_pipeline.py"
             parameters: ["--stages", "bronze"]
         - task_key: silver
           depends_on:
             - task_key: bronze
-          job_cluster_key: job_cluster
+          environment_key: default
           spark_python_task:
             python_file: "pipeline/etl_pipeline.py"
             parameters: ["--stages", "silver"]
         - task_key: gold
           depends_on:
             - task_key: silver
-          job_cluster_key: job_cluster
+          environment_key: default
           spark_python_task:
             python_file: "pipeline/etl_pipeline.py"
             parameters: ["--stages", "gold"]
@@ -46,6 +44,10 @@ targets:
     mode: development
     default: true
     workspace:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      host: ${env.DATABRICKS_HOST}
+
+  prod:
+    mode: production
+    workspace:
+      host: ${env.DATABRICKS_HOST}
 

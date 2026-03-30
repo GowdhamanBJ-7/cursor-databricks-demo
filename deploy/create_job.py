@@ -46,23 +46,15 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
         Job settings object.
     """
 
-    spark_version = os.environ.get("DATABRICKS_JOB_SPARK_VERSION", "15.4.x-scala2.12")
-    node_type_id = os.environ.get("DATABRICKS_JOB_NODE_TYPE_ID", "i3.xlarge")
-    num_workers = _env_int("DATABRICKS_JOB_NUM_WORKERS", 2)
-
     base_parameters = os.environ.get("DATABRICKS_JOB_PIPELINE_PARAMS", "")
     shared_params = [p for p in base_parameters.split() if p.strip()]
 
-    job_cluster_key = "job_cluster"
-    job_clusters = [
-        jobs.JobCluster(
-            job_cluster_key=job_cluster_key,
-            new_cluster=jobs.ClusterSpec(
-                spark_version=spark_version,
-                node_type_id=node_type_id,
-                num_workers=num_workers,
-                data_security_mode=compute.DataSecurityMode.SINGLE_USER,
-            ),
+    # Serverless workflows use environments + environment_key on tasks.
+    environment_key = "default"
+    environments = [
+        jobs.JobEnvironment(
+            environment_key=environment_key,
+            spec=compute.Environment(client="1"),
         )
     ]
 
@@ -71,7 +63,7 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
 
     bronze_task = jobs.Task(
         task_key="bronze",
-        job_cluster_key=job_cluster_key,
+        environment_key=environment_key,
         spark_python_task=jobs.SparkPythonTask(
             python_file=python_file,
             parameters=["--stages", "bronze", *shared_params],
@@ -81,7 +73,7 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
     silver_task = jobs.Task(
         task_key="silver",
         depends_on=[jobs.TaskDependency(task_key="bronze")],
-        job_cluster_key=job_cluster_key,
+        environment_key=environment_key,
         spark_python_task=jobs.SparkPythonTask(
             python_file=python_file,
             parameters=["--stages", "silver", *shared_params],
@@ -91,7 +83,7 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
     gold_task = jobs.Task(
         task_key="gold",
         depends_on=[jobs.TaskDependency(task_key="silver")],
-        job_cluster_key=job_cluster_key,
+        environment_key=environment_key,
         spark_python_task=jobs.SparkPythonTask(
             python_file=python_file,
             parameters=["--stages", "gold", *shared_params],
@@ -100,7 +92,8 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
 
     return jobs.JobSettings(
         name=job_name,
-        job_clusters=job_clusters,
+        environments=environments,
+        performance_target=jobs.PerformanceTarget.PERFORMANCE_OPTIMIZED,
         tasks=[bronze_task, silver_task, gold_task],
         max_concurrent_runs=1,
         timeout_seconds=_env_int("DATABRICKS_JOB_TIMEOUT_SECONDS", 0),
