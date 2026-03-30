@@ -145,7 +145,14 @@ def create_or_update_job(w: WorkspaceClient, job_name: str) -> int:
 
     if existing_job_id is None:
         logger.info("Creating new job: %s", job_name)
-        created = w.jobs.create(**settings.as_dict())
+        created = w.jobs.create(
+            name=settings.name,
+            environments=settings.environments,
+            performance_target=settings.performance_target,
+            tasks=settings.tasks,
+            max_concurrent_runs=settings.max_concurrent_runs,
+            timeout_seconds=settings.timeout_seconds,
+        )
         job_id = int(created.job_id)
         logger.info("Created job_id=%s", job_id)
         return job_id
@@ -187,7 +194,7 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 
-    job_name = os.environ.get("DATABRICKS_JOB_NAME", "nyc-taxi-medallion-etl")
+    job_name = os.environ.get("DATABRICKS_JOB_NAME", "nyc-taxi-medallion-etl").strip() or "nyc-taxi-medallion-etl"
     w = WorkspaceClient()
     job_id = create_or_update_job(w, job_name=job_name)
     save_job_id(job_id)
