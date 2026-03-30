@@ -3,8 +3,10 @@ from typing import Optional
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 from config.databricks_config import PipelineConfig
+from config.schema_config import get_bronze_schema
 
 
 logger = logging.getLogger(__name__)
@@ -12,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 def read_nyc_taxi_csv(
     spark: SparkSession,
-    source_path: str = "/databricks-datasets/nyctaxi/",
-    csv_glob: str = "**/*.csv",
+    source_path: str = "/databricks-datasets/nyctaxi/tripdata/yellow/",
+    csv_glob: str = "*.csv",
 ) -> DataFrame:
     """
     Read the NYC Taxi CSV dataset from the Databricks datasets path.
@@ -34,11 +36,15 @@ def read_nyc_taxi_csv(
     """
 
     path = f"{source_path.rstrip('/')}/{csv_glob}"
+    # Read only source data columns from Bronze schema (exclude audit columns).
+    bronze_schema = get_bronze_schema()
+    input_schema = T.StructType([f for f in bronze_schema.fields if not f.name.startswith("_")])
     logger.info("Reading NYC Taxi CSV from: %s", path)
     return (
         spark.read.option("header", True)
         .option("inferSchema", False)
         .option("mode", "PERMISSIVE")
+        .schema(input_schema)
         .csv(path)
     )
 
