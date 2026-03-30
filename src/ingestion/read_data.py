@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 from pyspark.sql import DataFrame, SparkSession
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 def read_nyc_taxi_csv(
     spark: SparkSession,
-    source_path: str = "/databricks-datasets/nyctaxi/tripdata/yellow/",
-    csv_glob: str = "*.csv",
+    source_path: str = "",
+    csv_glob: str = "",
 ) -> DataFrame:
     """
     Read the NYC Taxi CSV dataset from the Databricks datasets path.
@@ -35,17 +36,46 @@ def read_nyc_taxi_csv(
         Raw CSV dataset with headers.
     """
 
-    path = f"{source_path.rstrip('/')}/{csv_glob}"
+    configured_source = os.environ.get("NYC_TAXI_SOURCE_PATH", "").strip()
+    if source_path and csv_glob:
+        candidates = [f"{source_path.rstrip('/')}/{csv_glob}"]
+    elif configured_source:
+        candidates = [configured_source]
+    else:
+        candidates = [
+            "/databricks-datasets/nyctaxi/tripdata/yellow/*.csv",
+            "/databricks-datasets/nyctaxi/tripdata/yellow/yellow_tripdata_*.csv",
+            "/databricks-datasets/nyctaxi/tables/yellow_tripdata.csv",
+        ]
+
     # Read only source data columns from Bronze schema (exclude audit columns).
     bronze_schema = get_bronze_schema()
     input_schema = T.StructType([f for f in bronze_schema.fields if not f.name.startswith("_")])
-    logger.info("Reading NYC Taxi CSV from: %s", path)
-    return (
-        spark.read.option("header", True)
-        .option("inferSchema", False)
-        .option("mode", "PERMISSIVE")
-        .schema(input_schema)
-        .csv(path)
+    last_error: Optional[Exception] = None
+    for path in candidates:
+        try:
+            logger.info("Reading NYC Taxi CSV from: %s", path)
+            df = (
+                spark.read.option("header", True)
+                .option("inferSchema", False)
+                .option("mode", "PERMISSIVE")
+                .schema(input_schema)
+                .csv(path)
+            )
+            # Trigger lightweight analysis to fail fast on invalid paths.
+            df.limit(1).count()
+            return df
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if "PATH_NOT_FOUND" in str(exc):
+                logger.warning("Source path not found, trying next candidate: %s", path)
+                continue
+            raise
+
+    raise ValueError(
+        "NYC Taxi source path not found in this workspace. "
+        "Set NYC_TAXI_SOURCE_PATH environment variable to a valid CSV path. "
+        f"Tried: {candidates}. Last error: {last_error}"
     )
 
 

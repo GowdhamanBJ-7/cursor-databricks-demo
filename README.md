@@ -50,6 +50,7 @@ All credentials are read from environment variables only (no hardcoding).
 | `DATABRICKS_GIT_PYTHON_FILE` | Python file path inside git repo | `pipeline/etl_pipeline.py` |
 | `DATABRICKS_PIPELINE_WORKSPACE_PATH` | Absolute workspace fallback if not using git source | `/Workspace/Users/.../pipeline/etl_pipeline.py` |
 | `DATABRICKS_SERVERLESS_CLIENT` | Serverless REPL channel/client version | `2` |
+| `NYC_TAXI_SOURCE_PATH` | Optional explicit NYC Taxi source CSV path override | `/databricks-datasets/nyctaxi/tables/yellow_tripdata.csv` |
 | `PIPELINE_BRONZE_TABLE` | Bronze UC table | `catalog.schema.bronze_trips` |
 | `PIPELINE_SILVER_TABLE` | Silver UC table | `catalog.schema.silver_trips` |
 | `PIPELINE_GOLD_TABLE` | Gold UC table | `catalog.schema.gold_metrics` |
