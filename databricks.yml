@@ -46,9 +46,6 @@ targets:
     mode: development
     default: true
     workspace:
-      host: https://dbc-a8b5283c-41bc.cloud.databricks.com
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
-  prod:
-    mode: production
-    workspace:
-      host: ${env.DATABRICKS_HOST}
