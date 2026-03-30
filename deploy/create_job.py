@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import jobs
+from databricks.sdk.service import jobs, compute
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
                 spark_version=spark_version,
                 node_type_id=node_type_id,
                 num_workers=num_workers,
-                data_security_mode=jobs.DataSecurityMode.SINGLE_USER,
+                data_security_mode=compute.DataSecurityMode.SINGLE_USER,
             ),
         )
     ]
