@@ -106,6 +106,7 @@ def get_spark(app_name: str = "nyc-taxi-medallion") -> SparkSession:
         builder = builder.config(k, v)
 
     spark = builder.getOrCreate()
-    logger.info("SparkSession created with master: %s", spark.sparkContext.master)
+    # Avoid JVM-backed attributes (for example spark.sparkContext) on serverless.
+    logger.info("SparkSession created successfully (version=%s)", spark.version)
     return spark
 
