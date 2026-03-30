@@ -42,9 +42,13 @@ All credentials are read from environment variables only (no hardcoding).
 | `DATABRICKS_HOST` | Databricks workspace URL | `https://dbc-xxx.cloud.databricks.com` |
 | `DATABRICKS_TOKEN` | PAT token for Databricks SDK | `dapi...` |
 | `DATABRICKS_JOB_NAME` | Workflow job name | `nyc-taxi-medallion-etl` |
-| `DATABRICKS_JOB_SPARK_VERSION` | Job cluster Spark version | `15.4.x-scala2.12` |
-| `DATABRICKS_JOB_NODE_TYPE_ID` | Job cluster node type | `i3.xlarge` |
-| `DATABRICKS_JOB_NUM_WORKERS` | Job cluster workers | `2` |
+| `DATABRICKS_GIT_URL` | Git repo URL for Databricks job source (recommended) | `https://github.com/org/repo.git` |
+| `DATABRICKS_GIT_PROVIDER` | Databricks git provider value | `gitHub` |
+| `DATABRICKS_GIT_BRANCH` | Git branch for job source (if tag/commit not set) | `main` |
+| `DATABRICKS_GIT_TAG` | Optional git tag for job source | `v1.0.0` |
+| `DATABRICKS_GIT_COMMIT` | Optional git commit SHA for job source | `abc123...` |
+| `DATABRICKS_GIT_PYTHON_FILE` | Python file path inside git repo | `pipeline/etl_pipeline.py` |
+| `DATABRICKS_PIPELINE_WORKSPACE_PATH` | Absolute workspace fallback if not using git source | `/Workspace/Users/.../pipeline/etl_pipeline.py` |
 | `PIPELINE_BRONZE_TABLE` | Bronze UC table | `catalog.schema.bronze_trips` |
 | `PIPELINE_SILVER_TABLE` | Silver UC table | `catalog.schema.silver_trips` |
 | `PIPELINE_GOLD_TABLE` | Gold UC table | `catalog.schema.gold_metrics` |
@@ -93,9 +97,10 @@ Configure these secrets in your repository settings:
 - `DATABRICKS_HOST`
 - `DATABRICKS_TOKEN`
 - `DATABRICKS_JOB_NAME` (optional; defaults to `nyc-taxi-medallion-etl`)
-- `DATABRICKS_JOB_SPARK_VERSION` (optional)
-- `DATABRICKS_JOB_NODE_TYPE_ID` (optional)
-- `DATABRICKS_JOB_NUM_WORKERS` (optional)
+- `DATABRICKS_GIT_URL` (recommended for CI deploy)
+- `DATABRICKS_GIT_PROVIDER` (e.g. `gitHub`)
+- `DATABRICKS_GIT_BRANCH` (e.g. `main`)
+- `DATABRICKS_GIT_PYTHON_FILE` (optional, defaults to `pipeline/etl_pipeline.py`)
 - `PIPELINE_BRONZE_TABLE`
 - `PIPELINE_SILVER_TABLE`
 - `PIPELINE_GOLD_TABLE`

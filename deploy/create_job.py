@@ -58,8 +58,44 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
         )
     ]
 
-    pipeline_path = os.environ.get("DATABRICKS_PIPELINE_WORKSPACE_PATH", "pipeline/etl_pipeline.py")
-    python_file = pipeline_path
+    # Two supported execution modes for spark_python_task:
+    # 1) GIT source (recommended for CI/CD): provide DATABRICKS_GIT_URL (+ provider, branch/tag/commit)
+    # 2) WORKSPACE source: provide absolute DATABRICKS_PIPELINE_WORKSPACE_PATH (e.g. /Workspace/...)
+    git_url = os.environ.get("DATABRICKS_GIT_URL", "").strip()
+    git_provider_raw = os.environ.get("DATABRICKS_GIT_PROVIDER", "gitHub").strip()
+    git_branch = os.environ.get("DATABRICKS_GIT_BRANCH", "").strip()
+    git_tag = os.environ.get("DATABRICKS_GIT_TAG", "").strip()
+    git_commit = os.environ.get("DATABRICKS_GIT_COMMIT", "").strip()
+
+    if git_url:
+        try:
+            git_provider = jobs.GitProvider(git_provider_raw)
+        except ValueError as exc:
+            valid = ", ".join(g.value for g in jobs.GitProvider)
+            raise ValueError(f"Invalid DATABRICKS_GIT_PROVIDER={git_provider_raw!r}. Use one of: {valid}") from exc
+
+        git_source = jobs.GitSource(git_url=git_url, git_provider=git_provider)
+        if git_commit:
+            git_source.git_commit = git_commit
+        elif git_tag:
+            git_source.git_tag = git_tag
+        else:
+            git_source.git_branch = git_branch or "main"
+
+        python_file = os.environ.get("DATABRICKS_GIT_PYTHON_FILE", "pipeline/etl_pipeline.py").strip()
+        task_source = jobs.Source.GIT
+    else:
+        git_source = None
+        python_file = os.environ.get("DATABRICKS_PIPELINE_WORKSPACE_PATH", "").strip()
+        if not python_file:
+            raise ValueError(
+                "Set DATABRICKS_GIT_URL for Git-based jobs or DATABRICKS_PIPELINE_WORKSPACE_PATH for workspace-based jobs."
+            )
+        if not python_file.startswith("/"):
+            raise ValueError(
+                f"DATABRICKS_PIPELINE_WORKSPACE_PATH must be an absolute workspace path, got: {python_file!r}"
+            )
+        task_source = jobs.Source.WORKSPACE
 
     bronze_task = jobs.Task(
         task_key="bronze",
@@ -67,6 +103,7 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
         spark_python_task=jobs.SparkPythonTask(
             python_file=python_file,
             parameters=["--stages", "bronze", *shared_params],
+            source=task_source,
         ),
     )
 
@@ -77,6 +114,7 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
         spark_python_task=jobs.SparkPythonTask(
             python_file=python_file,
             parameters=["--stages", "silver", *shared_params],
+            source=task_source,
         ),
     )
 
@@ -87,11 +125,13 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
         spark_python_task=jobs.SparkPythonTask(
             python_file=python_file,
             parameters=["--stages", "gold", *shared_params],
+            source=task_source,
         ),
     )
 
     return jobs.JobSettings(
         name=job_name,
+        git_source=git_source,
         environments=environments,
         performance_target=jobs.PerformanceTarget.PERFORMANCE_OPTIMIZED,
         tasks=[bronze_task, silver_task, gold_task],
@@ -147,6 +187,7 @@ def create_or_update_job(w: WorkspaceClient, job_name: str) -> int:
         logger.info("Creating new job: %s", job_name)
         created = w.jobs.create(
             name=settings.name,
+            git_source=settings.git_source,
             environments=settings.environments,
             performance_target=settings.performance_target,
             tasks=settings.tasks,

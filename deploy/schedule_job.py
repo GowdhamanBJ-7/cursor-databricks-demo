@@ -45,7 +45,7 @@ def schedule_daily_6am_utc(w: WorkspaceClient, job_id: int) -> None:
 
     cron = jobs.CronSchedule(quartz_cron_expression="0 0 6 * * ?", timezone_id="UTC")
     new_settings = current.settings
-    new_settings.schedule = jobs.Schedule(cron_schedule=cron)
+    new_settings.schedule = cron
 
     logger.info("Setting daily schedule 6AM UTC for job_id=%s", job_id)
     w.jobs.reset(job_id=job_id, new_settings=new_settings)
