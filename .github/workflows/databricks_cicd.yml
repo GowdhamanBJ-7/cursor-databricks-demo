@@ -31,11 +31,11 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-      DATABRICKS_JOB_NAME: ${{ secrets.DATABRICKS_JOB_NAME }}
-      DATABRICKS_GIT_URL: ${{ secrets.DATABRICKS_GIT_URL }}
-      DATABRICKS_GIT_PROVIDER: ${{ secrets.DATABRICKS_GIT_PROVIDER }}
-      DATABRICKS_GIT_BRANCH: ${{ secrets.DATABRICKS_GIT_BRANCH }}
-      DATABRICKS_GIT_PYTHON_FILE: ${{ secrets.DATABRICKS_GIT_PYTHON_FILE }}
+      DATABRICKS_JOB_NAME: ${{ secrets.DATABRICKS_JOB_NAME || 'nyc-taxi-medallion-etl' }}
+      DATABRICKS_GIT_URL: ${{ secrets.DATABRICKS_GIT_URL || format('{0}/{1}.git', github.server_url, github.repository) }}
+      DATABRICKS_GIT_PROVIDER: ${{ secrets.DATABRICKS_GIT_PROVIDER || 'gitHub' }}
+      DATABRICKS_GIT_BRANCH: ${{ secrets.DATABRICKS_GIT_BRANCH || github.ref_name }}
+      DATABRICKS_GIT_PYTHON_FILE: ${{ secrets.DATABRICKS_GIT_PYTHON_FILE || 'pipeline/etl_pipeline.py' }}
       PIPELINE_BRONZE_TABLE: ${{ secrets.PIPELINE_BRONZE_TABLE }}
       PIPELINE_SILVER_TABLE: ${{ secrets.PIPELINE_SILVER_TABLE }}
       PIPELINE_GOLD_TABLE: ${{ secrets.PIPELINE_GOLD_TABLE }}

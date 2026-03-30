@@ -31,6 +31,23 @@ def _env_int(name: str, default: int) -> int:
     return int(value) if value is not None and value != "" else default
 
 
+def _derive_git_url_from_github_actions() -> str:
+    """
+    Derive git URL from GitHub Actions environment when explicit value is missing.
+
+    Returns
+    -------
+    str
+        Derived git URL or empty string if not derivable.
+    """
+
+    server = os.environ.get("GITHUB_SERVER_URL", "").strip()
+    repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if server and repo:
+        return f"{server}/{repo}.git"
+    return ""
+
+
 def _build_job_settings(job_name: str) -> jobs.JobSettings:
     """
     Build the Databricks Workflow Job settings with 3 tasks (bronze, silver, gold).
@@ -61,9 +78,9 @@ def _build_job_settings(job_name: str) -> jobs.JobSettings:
     # Two supported execution modes for spark_python_task:
     # 1) GIT source (recommended for CI/CD): provide DATABRICKS_GIT_URL (+ provider, branch/tag/commit)
     # 2) WORKSPACE source: provide absolute DATABRICKS_PIPELINE_WORKSPACE_PATH (e.g. /Workspace/...)
-    git_url = os.environ.get("DATABRICKS_GIT_URL", "").strip()
+    git_url = os.environ.get("DATABRICKS_GIT_URL", "").strip() or _derive_git_url_from_github_actions()
     git_provider_raw = os.environ.get("DATABRICKS_GIT_PROVIDER", "gitHub").strip()
-    git_branch = os.environ.get("DATABRICKS_GIT_BRANCH", "").strip()
+    git_branch = os.environ.get("DATABRICKS_GIT_BRANCH", "").strip() or os.environ.get("GITHUB_REF_NAME", "").strip()
     git_tag = os.environ.get("DATABRICKS_GIT_TAG", "").strip()
     git_commit = os.environ.get("DATABRICKS_GIT_COMMIT", "").strip()
 
